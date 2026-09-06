@@ -1,104 +1,129 @@
-const COOKIE_NAME = "theory";
-const tbody = document.getElementById("workout-tbody");
+const SCRIPTURES_URL = "/scriptures.xml";
+const API_URL = "/api/scriptures";
+const tbody = document.getElementById("theory-tbody");
 const emailSection = document.getElementById("email-section");
 
 let theory = [];
 let registeredEmail = "";
+const REFERENCE_PATTERN = /^\d{1,2}:\d{1,3}-\d{1,3}$/;
 
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
-function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) {
-    return decodeURIComponent(parts.pop().split(";").shift());
-  }
-  return null;
+function escapeXml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
-function setCookie(name, value, days = 365) {
-  const expires = new Date(Date.now() + days * 864e5).toUTCString();
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+function buildDefaultScripturesXml() {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<scriptures>
+  <email></email>
+  <entries></entries>
+</scriptures>`;
+}
+
+function parseScripturesXml(xmlText) {
+  const text = (xmlText || "").trim();
+  if (!text) {
+    return { email: "", theory: [] };
+  }
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, "application/xml");
+  const parseError = doc.querySelector("parsererror");
+
+  if (parseError) {
+    return { email: "", theory: [] };
+  }
+
+  const email = doc.querySelector("email")?.textContent?.trim() || "";
+  const entries = Array.from(doc.querySelectorAll("entry")).map((entry) => ({
+    id: entry.querySelector("id")?.textContent?.trim() || generateId(),
+    reference: entry.querySelector("reference")?.textContent?.trim() || "",
+    text: entry.querySelector("text")?.textContent?.trim() || "",
+    stance: entry.querySelector("stance")?.textContent?.trim() || "pro"
+  }));
+
+  return { email, theory: entries };
+}
+
+function buildScripturesXml(data) {
+  const list = (data.theory || []).map((item) => `
+    <entry>
+      <id>${escapeXml(item.id || generateId())}</id>
+      <reference>${escapeXml(item.reference || "")}</reference>
+      <text>${escapeXml(item.text || "")}</text>
+      <stance>${escapeXml(item.stance || "pro")}</stance>
+    </entry>
+  `).join("");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<scriptures>
+  <email>${escapeXml(data.email || "")}</email>
+  <entries>${list}</entries>
+</scriptures>`;
 }
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
 }
 
-function persistCookie() {
-  setCookie(COOKIE_NAME, JSON.stringify({
-    email: registeredEmail || "",
-    theory
-  }));
+function isValidReference(reference) {
+  return REFERENCE_PATTERN.test(String(reference || "").trim());
 }
 
-function loadtheory() {
-  const raw = getCookie(COOKIE_NAME);
+async function persistScriptures() {
+  const xml = buildScripturesXml({ email: registeredEmail || "", theory });
+  const response = await fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/xml" },
+    body: xml
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to save the scriptures file.");
+  }
+}
+
+async function loadtheory() {
   theory = [];
   registeredEmail = "";
 
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        theory = parsed;
-      } else if (parsed && typeof parsed === "object") {
-        theory = Array.isArray(parsed.theory) ? parsed.theory : [];
-        registeredEmail = parsed.email || "";
-      }
-    } catch {
-      theory = [];
-    }
+  try {
+    const response = await fetch(SCRIPTURES_URL, { cache: "no-store" });
+    const raw = await response.text();
+    const parsed = parseScripturesXml(raw || buildDefaultScripturesXml());
+    theory = parsed.theory;
+    registeredEmail = parsed.email || "";
+  } catch {
+    theory = [];
+    registeredEmail = "";
   }
 
-  sorttheory();
   renderEmailSection();
   renderTable();
 }
 
-function savetheory() {
-  persistCookie();
+async function savetheory() {
+  await persistScriptures();
 }
 
 function sorttheory() {
   theory.sort((a, b) => {
-    const da = a.date + "T" + (a.time || "00:00");
-    const db = b.date + "T" + (b.time || "00:00");
-    return db.localeCompare(da);
+    const aRef = (a.reference || "0:0-0").split(":");
+    const bRef = (b.reference || "0:0-0").split(":");
+    const aStart = Number((aRef[1] || "0").split("-")[0]);
+    const bStart = Number((bRef[1] || "0").split("-")[0]);
+    const aMain = Number(aRef[0] || 0);
+    const bMain = Number(bRef[0] || 0);
+    return bMain - aMain || bStart - aStart;
   });
-}
-
-function buildTimeOptions(selected = "") {
-  let html = "";
-  for (let h = 5; h <= 23; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      const hh = String(h).padStart(2, "0");
-      const mm = String(m).padStart(2, "0");
-      const val = `${hh}:${mm}`;
-      html += `<option value="${val}" ${val === selected ? "selected" : ""}>${val}</option>`;
-    }
-  }
-  return html;
-}
-
-function getToday() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function getLatestDefaults() {
-  if (theory.length === 0) {
-    return { type: "walk", distance: "" };
-  }
-  return {
-    type: theory[0].type || "walk",
-    distance: theory[0].distance != null ? theory[0].distance : ""
-  };
 }
 
 function escapeHtml(value) {
@@ -110,61 +135,36 @@ function escapeHtml(value) {
 }
 
 function createInputRow() {
-  const defaults = getLatestDefaults();
   const tr = document.createElement("tr");
   tr.className = "input-row";
   tr.innerHTML = `
-    <td><input type="date" id="new-date" value="${getToday()}"></td>
-    <td><select id="new-time">${buildTimeOptions("07:00")}</select></td>
-    <td>
-      <select id="new-type">
-        <option value="walk" ${defaults.type === "walk" ? "selected" : ""}>walk</option>
-        <option value="run" ${defaults.type === "run" ? "selected" : ""}>run</option>
-        <option value="swim" ${defaults.type === "swim" ? "selected" : ""}>swim</option>
-        <option value="bike" ${defaults.type === "bike" ? "selected" : ""}>bike</option>
-        <option value="other" ${defaults.type === "other" ? "selected" : ""}>other</option>
-      </select>
-    </td>
-    <td><input type="number" id="new-distance" step="0.01" min="0" value="${defaults.distance}" placeholder="0.00"></td>
-    <td><input type="number" id="new-pace" step="0.1" min="0" placeholder="0.0"></td>
-    <td><input type="text" id="new-bp" placeholder="120/80"></td>
-    <td><input type="number" id="new-temp" step="1" placeholder="°F"></td>
-    <td><input type="text" id="new-weather" placeholder="sunny, rainy..."></td>
-    <td><textarea id="new-comments" rows="1" placeholder="notes..."></textarea></td>
-    <td>
-      <button type="button" class="btn-save" id="btn-add-save">Save</button>
-      <button type="button" class="btn-cancel" id="btn-add-cancel">Cancel</button>
+    <td colspan="2">
+      <div class="input-form">
+        <input type="text" id="new-reference" placeholder="12:345-347" maxlength="12">
+        <textarea id="new-text" rows="2" placeholder="Enter the scripture text..."></textarea>
+        <select id="new-stance">
+          <option value="pro">pro</option>
+          <option value="con">con</option>
+        </select>
+        <button type="button" class="btn-save" id="btn-add-save">Save</button>
+        <button type="button" class="btn-cancel" id="btn-add-cancel">Clear</button>
+      </div>
     </td>
   `;
   return tr;
 }
 
 function clearInputRow() {
-  document.getElementById("new-date").value = getToday();
-  document.getElementById("new-time").value = "07:00";
-  const defaults = getLatestDefaults();
-  document.getElementById("new-type").value = defaults.type;
-  document.getElementById("new-distance").value = defaults.distance;
-  document.getElementById("new-pace").value = "";
-  document.getElementById("new-bp").value = "";
-  document.getElementById("new-temp").value = "";
-  document.getElementById("new-weather").value = "";
-  document.getElementById("new-comments").value = "";
+  document.getElementById("new-reference").value = "";
+  document.getElementById("new-text").value = "";
+  document.getElementById("new-stance").value = "pro";
 }
 
 function collectInputValues(prefix = "new-") {
   return {
-    date: document.getElementById(prefix + "date").value,
-    time: document.getElementById(prefix + "time").value,
-    type: document.getElementById(prefix + "type").value,
-    distance: parseFloat(document.getElementById(prefix + "distance").value) || 0,
-    pace: parseFloat(document.getElementById(prefix + "pace").value) || 0,
-    bp: document.getElementById(prefix + "bp").value.trim(),
-    temp: document.getElementById(prefix + "temp").value
-      ? parseFloat(document.getElementById(prefix + "temp").value)
-      : null,
-    weather: document.getElementById(prefix + "weather").value.trim(),
-    comments: document.getElementById(prefix + "comments").value.trim()
+    reference: document.getElementById(prefix + "reference").value.trim(),
+    text: document.getElementById(prefix + "text").value.trim(),
+    stance: document.getElementById(prefix + "stance").value.trim().toLowerCase()
   };
 }
 
@@ -188,7 +188,7 @@ function renderEmailSection() {
   }
 }
 
-function registerEmail() {
+async function registerEmail() {
   const email = prompt("Enter your email address:");
   if (!email) return;
   const trimmed = email.trim();
@@ -197,40 +197,32 @@ function registerEmail() {
     return;
   }
   registeredEmail = trimmed;
-  persistCookie();
+  try {
+    await persistScriptures();
+  } catch (err) {
+    console.error(err);
+  }
   renderEmailSection();
   alert("Email registered successfully.");
 }
 
 function buildEmailTableHtml(list) {
-  const rows = list.map((w) => `
+  const rows = list.map((item) => `
     <tr>
-      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.date)}</td>
-      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.time)}</td>
-      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.type)}</td>
-      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.distance)}</td>
-      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.pace)}</td>
-      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.bp || "")}</td>
-      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${w.temp != null ? escapeHtml(w.temp) : ""}</td>
-      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.weather || "")}</td>
-      <td style="padding:8px;border:1px solid #ccc;text-align:left;">${escapeHtml(w.comments || "")}</td>
+      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(item.reference)}</td>
+      <td style="padding:8px;border:1px solid #ccc;text-align:left;">${escapeHtml(item.text)}</td>
+      <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(item.stance || "pro")}</td>
     </tr>
   `).join("");
 
   return `
-    <h1 style="font-family:Arial,sans-serif;color:#ff1493;">Workout Tracker</h1>
+    <h1 style="font-family:Arial,sans-serif;color:#ff1493;">Scripture Tracker</h1>
     <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:14px;">
       <thead>
         <tr>
-          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Date</th>
-          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Time</th>
-          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Type</th>
-          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Distance (mi)</th>
-          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Pace (min/mi)</th>
-          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">BP</th>
-          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Temp (°F)</th>
-          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Weather</th>
-          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Comments</th>
+          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Reference</th>
+          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Scripture Text</th>
+          <th style="background:#ff69b4;color:#fff;padding:8px;border:1px solid #ff69b4;">Pro / Con</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -245,10 +237,10 @@ async function sendtheoryEmail() {
     return;
   }
   if (theory.length === 0) {
-    alert("No theory to email.");
+    alert("No scripture notes to email.");
     return;
   }
-  if (!confirm(`Send all ${theory.length} workout(s) to ${registeredEmail}?`)) return;
+  if (!confirm(`Send all ${theory.length} scripture note(s) to ${registeredEmail}?`)) return;
 
   try {
     const res = await fetch("/api/send-mail", {
@@ -256,7 +248,7 @@ async function sendtheoryEmail() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         email: registeredEmail,
-        subject: "Workout Tracker",
+        subject: "Scripture Tracker",
         html: buildEmailTableHtml(theory),
         theory
       })
@@ -273,6 +265,36 @@ async function sendtheoryEmail() {
   }
 }
 
+function createEntryCard(item) {
+  return `
+    <div class="entry-card ${item.stance || "pro"}" data-id="${item.id}">
+      <div class="entry-reference">${escapeHtml(item.reference)}</div>
+      <div class="entry-text">${escapeHtml(item.text)}</div>
+      <div class="entry-actions">
+        <button type="button" class="btn-edit">Edit</button>
+        <button type="button" class="btn-delete">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
+function createEntryEditor(item) {
+  return `
+    <div class="entry-card editing ${item.stance || "pro"}" data-id="${item.id}">
+      <input type="text" class="edit-reference" value="${escapeHtml(item.reference)}" maxlength="12">
+      <textarea class="edit-text" rows="2">${escapeHtml(item.text)}</textarea>
+      <select class="edit-stance">
+        <option value="pro" ${item.stance === "pro" ? "selected" : ""}>pro</option>
+        <option value="con" ${item.stance === "con" ? "selected" : ""}>con</option>
+      </select>
+      <div class="entry-actions">
+        <button type="button" class="btn-save">Save</button>
+        <button type="button" class="btn-cancel">Cancel</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderTable() {
   tbody.innerHTML = "";
 
@@ -281,112 +303,105 @@ function renderTable() {
 
   document.getElementById("btn-add-save").addEventListener("click", () => {
     const data = collectInputValues("new-");
-    if (!data.date || !data.time) {
-      alert("Date and time are required.");
+    if (!isValidReference(data.reference)) {
+      alert("Reference must use the format dd:ddd-ddd.");
       return;
     }
+    if (!data.text) {
+      alert("Scripture text is required.");
+      return;
+    }
+    if (!["pro", "con"].includes(data.stance)) {
+      alert("Please choose pro or con.");
+      return;
+    }
+
     theory.unshift({ id: generateId(), ...data });
     sorttheory();
-    savetheory();
-    renderTable();
+    savetheory().then(() => renderTable()).catch(() => renderTable());
   });
 
   document.getElementById("btn-add-cancel").addEventListener("click", clearInputRow);
 
-  if (theory.length === 0) {
-    const emptyTr = document.createElement("tr");
-    emptyTr.innerHTML = `<td colspan="10" class="empty-message">No theory yet. Add your first one above!</td>`;
-    tbody.appendChild(emptyTr);
-    return;
-  }
+  const tableHeaderRow = document.createElement("tr");
+  tableHeaderRow.className = "side-by-side-header";
+  tableHeaderRow.innerHTML = `
+    <th class="pro-column-header">Pro</th>
+    <th class="con-column-header">Con</th>
+  `;
+  tbody.appendChild(tableHeaderRow);
 
-  theory.forEach((w) => {
-    const tr = document.createElement("tr");
-    tr.dataset.id = w.id;
-    tr.innerHTML = `
-      <td class="display">${escapeHtml(w.date)}</td>
-      <td class="display">${escapeHtml(w.time)}</td>
-      <td class="display">${escapeHtml(w.type)}</td>
-      <td class="display">${escapeHtml(w.distance)}</td>
-      <td class="display">${escapeHtml(w.pace)}</td>
-      <td class="display">${escapeHtml(w.bp || "")}</td>
-      <td class="display">${w.temp != null ? escapeHtml(w.temp) : ""}</td>
-      <td class="display">${escapeHtml(w.weather || "")}</td>
-      <td class="display">${escapeHtml(w.comments || "")}</td>
-      <td>
-        <button type="button" class="btn-edit">Edit</button>
-        <button type="button" class="btn-delete">Delete</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
+  const leftCell = document.createElement("td");
+  leftCell.className = "pro-column";
+  const rightCell = document.createElement("td");
+  rightCell.className = "con-column";
 
-    tr.querySelector(".btn-edit").addEventListener("click", () => startInlineEdit(tr, w));
-    tr.querySelector(".btn-delete").addEventListener("click", () => {
-      if (!confirm("Delete this workout?")) return;
-      theory = theory.filter((item) => item.id !== w.id);
-      savetheory();
-      renderTable();
+  const proEntries = theory.filter((item) => item.stance === "pro");
+  const conEntries = theory.filter((item) => item.stance === "con");
+
+  leftCell.innerHTML = proEntries.length
+    ? proEntries.map(createEntryCard).join("")
+    : '<div class="empty-column">No pro entries yet.</div>';
+
+  rightCell.innerHTML = conEntries.length
+    ? conEntries.map(createEntryCard).join("")
+    : '<div class="empty-column">No con entries yet.</div>';
+
+  const columnsRow = document.createElement("tr");
+  columnsRow.appendChild(leftCell);
+  columnsRow.appendChild(rightCell);
+  tbody.appendChild(columnsRow);
+
+  tbody.querySelectorAll(".entry-card").forEach((card) => {
+    const item = theory.find((entry) => entry.id === card.dataset.id);
+    if (!item) return;
+
+    card.querySelector(".btn-edit")?.addEventListener("click", () => startInlineEdit(card, item));
+    card.querySelector(".btn-delete")?.addEventListener("click", () => {
+      if (!confirm("Delete this scripture note?")) return;
+      theory = theory.filter((entry) => entry.id !== item.id);
+      savetheory().then(() => renderTable()).catch(() => renderTable());
     });
   });
 }
 
-function startInlineEdit(tr, w) {
-  tr.classList.add("editing");
-  tr.innerHTML = `
-    <td><input type="date" class="edit-date" value="${escapeHtml(w.date)}"></td>
-    <td><select class="edit-time">${buildTimeOptions(w.time)}</select></td>
-    <td>
-      <select class="edit-type">
-        <option value="walk" ${w.type === "walk" ? "selected" : ""}>walk</option>
-        <option value="run" ${w.type === "run" ? "selected" : ""}>run</option>
-        <option value="swim" ${w.type === "swim" ? "selected" : ""}>swim</option>
-        <option value="bike" ${w.type === "bike" ? "selected" : ""}>bike</option>
-        <option value="other" ${w.type === "other" ? "selected" : ""}>other</option>
-      </select>
-    </td>
-    <td><input type="number" class="edit-distance" step="0.01" min="0" value="${w.distance}"></td>
-    <td><input type="number" class="edit-pace" step="0.1" min="0" value="${w.pace}"></td>
-    <td><input type="text" class="edit-bp" value="${escapeHtml(w.bp || "")}" placeholder="120/80"></td>
-    <td><input type="number" class="edit-temp" step="1" value="${w.temp != null ? w.temp : ""}"></td>
-    <td><input type="text" class="edit-weather" value="${escapeHtml(w.weather || "")}"></td>
-    <td><textarea class="edit-comments" rows="1">${escapeHtml(w.comments || "")}</textarea></td>
-    <td>
-      <button type="button" class="btn-save">Save</button>
-      <button type="button" class="btn-cancel">Cancel</button>
-    </td>
-  `;
+function startInlineEdit(card, item) {
+  card.classList.add("editing");
+  card.innerHTML = createEntryEditor(item).replace(/^\s*<div[^>]*>|<\/div>\s*$/g, "");
 
-  tr.querySelector(".btn-save").addEventListener("click", () => {
+  const saveButton = card.querySelector(".btn-save");
+  const cancelButton = card.querySelector(".btn-cancel");
+
+  saveButton?.addEventListener("click", () => {
     const updated = {
-      id: w.id,
-      date: tr.querySelector(".edit-date").value,
-      time: tr.querySelector(".edit-time").value,
-      type: tr.querySelector(".edit-type").value,
-      distance: parseFloat(tr.querySelector(".edit-distance").value) || 0,
-      pace: parseFloat(tr.querySelector(".edit-pace").value) || 0,
-      bp: tr.querySelector(".edit-bp").value.trim(),
-      temp: tr.querySelector(".edit-temp").value
-        ? parseFloat(tr.querySelector(".edit-temp").value)
-        : null,
-      weather: tr.querySelector(".edit-weather").value.trim(),
-      comments: tr.querySelector(".edit-comments").value.trim()
+      id: item.id,
+      reference: card.querySelector(".edit-reference").value.trim(),
+      text: card.querySelector(".edit-text").value.trim(),
+      stance: card.querySelector(".edit-stance").value.trim().toLowerCase()
     };
 
-    if (!updated.date || !updated.time) {
-      alert("Date and time are required.");
+    if (!isValidReference(updated.reference)) {
+      alert("Reference must use the format dd:ddd-ddd.");
+      return;
+    }
+    if (!updated.text) {
+      alert("Scripture text is required.");
+      return;
+    }
+    if (!["pro", "con"].includes(updated.stance)) {
+      alert("Please choose pro or con.");
       return;
     }
 
-    const idx = theory.findIndex((item) => item.id === w.id);
+    const idx = theory.findIndex((entry) => entry.id === item.id);
     if (idx !== -1) {
       theory[idx] = updated;
       sorttheory();
-      savetheory();
-      renderTable();
+      savetheory().then(() => renderTable()).catch(() => renderTable());
     }
   });
 
-  tr.querySelector(".btn-cancel").addEventListener("click", () => {
+  cancelButton?.addEventListener("click", () => {
     renderTable();
   });
 }

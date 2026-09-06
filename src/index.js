@@ -1,5 +1,7 @@
 import { Resend } from "resend";
 
+const SCRIPTURES_KEY = "__scriptures_xml__";
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -10,6 +12,22 @@ function escapeHtml(value) {
 
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
+}
+
+function getScripturesXml() {
+  return typeof globalThis[SCRIPTURES_KEY] === "string" ? globalThis[SCRIPTURES_KEY] : null;
+}
+
+function setScripturesXml(xml) {
+  globalThis[SCRIPTURES_KEY] = String(xml || "");
+}
+
+function buildDefaultScripturesXml() {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<scriptures>
+  <email></email>
+  <entries></entries>
+</scriptures>`;
 }
 
 function buildWorkoutTable(theory) {
@@ -51,6 +69,29 @@ function buildWorkoutTable(theory) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/scriptures.xml" && request.method === "GET") {
+      const xml = getScripturesXml();
+      if (xml) {
+        return new Response(xml, {
+          headers: { "Content-Type": "application/xml; charset=utf-8" }
+        });
+      }
+      return env.ASSETS.fetch(request);
+    }
+
+    if (url.pathname === "/api/scriptures" && request.method === "POST") {
+      try {
+        const xml = await request.text();
+        setScripturesXml(xml && xml.trim() ? xml : buildDefaultScripturesXml());
+        return Response.json({ success: true });
+      } catch (err) {
+        return Response.json(
+          { success: false, error: err.message || "Unknown error" },
+          { status: 500 }
+        );
+      }
+    }
 
     if (url.pathname === "/api/send-mail" && request.method === "POST") {
       try {
