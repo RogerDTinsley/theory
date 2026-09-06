@@ -1,0 +1,34 @@
+I want to create a web page to track my workouts.
+
+The workouts are to be shown in a table in descending date sequence that uses as much of the screen width as possible.
+
+I want to use cookies to show all the workouts that have already been added, with the first line being used to enter a new workout 
+that will be added to the front of the list of existing workouts and saved back to the cookie.
+
+The first line of the table is used to enter the latest workout.  It should have a button to save the entry or to cancel(clear) the entry.
+The date field should default to the current date.  The time field should have selections starting at 5 am and be in 15 minute increments.
+The workout type should default to whatever the workout type of the latest workout in the cookie is.  The same for the distance.  This 
+first line should appear, even if there are no other workouts to show.
+
+The remainder of the table is populated from a cookie and shows all previously entered workouts.  Each of these lines should have a delete
+button and an edit button.  Fields of the line are read only until the edit button is clicked, at which time they will be modifiable and 
+the edit button becomes a save button and the delete button becomes a cancel button.  When the save button is clicked, the workout is 
+updated in the cookie and the buttons revert to save and delete.
+
+Data for a workout includes date, time, workout type (walk, run, swim, bike, other), distance, pace (minutes/mile), blood pressure,
+outside temperature, weather conditions, and comments.
+
+create separate files for css and index.html, scripts, etc.  
+
+Use this website https://emailing.rogerdtinsley.workers.dev/ when processing this request.
+Only report changes to files required by this request, but show the entire file(s) affected.
+
+the site is hosted on cloudflare.
+I use github desktop because I don't like cli.
+
+Add emails 
+I want to click a button and have an email sent with all the workouts.  Do this only if there is a valid email in the cookie.
+Before the "email" button is visible, there should be a "register my email" button assuming there is no valid email in the cookie.
+When an email address is "registered", it becomes part of the cookie.
+The body of the email is the same table that is displayed, except that it will not include the line used for entering a new workout.
+The email will be sent with my resend account.

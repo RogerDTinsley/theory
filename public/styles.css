@@ -1,0 +1,206 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: linear-gradient(135deg, #ff69b4 0%, #40e0d0 100%);
+  min-height: 100vh;
+  color: #333;
+  padding: 1rem;
+}
+
+.container {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 100%;
+  padding: 1.5rem;
+  margin: 0 auto;
+}
+
+h1 {
+  color: #ff1493;
+  margin-bottom: 0.25rem;
+  font-size: 2rem;
+  text-align: center;
+}
+
+.subtitle {
+  color: #20b2aa;
+  margin-bottom: 1.5rem;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.email-section {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border: 2px solid #40e0d0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  table-layout: auto;
+}
+
+th {
+  background: #ff69b4;
+  color: white;
+  padding: 0.75rem 0.5rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+td {
+  padding: 0.5rem;
+  text-align: center;
+  border-bottom: 1px solid #e0f7f5;
+  color: #444;
+  vertical-align: middle;
+}
+
+tr:nth-child(even) {
+  background: #fff0f5;
+}
+
+tr.input-row {
+  background: #fff0f5;
+}
+
+tr.editing {
+  background: #e0f7f5;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 0.45rem 0.5rem;
+  border: 2px solid #40e0d0;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: white;
+  text-align: center;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #ff69b4;
+  box-shadow: 0 0 0 3px rgba(255, 105, 180, 0.3);
+}
+
+textarea {
+  resize: vertical;
+  text-align: left;
+  min-height: 2.2rem;
+}
+
+button {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+  margin: 0 0.15rem;
+  white-space: nowrap;
+}
+
+.btn-save {
+  background: #ff69b4;
+  color: white;
+}
+
+.btn-save:hover {
+  background: #ff1493;
+  transform: translateY(-1px);
+}
+
+.btn-cancel {
+  background: #40e0d0;
+  color: #333;
+}
+
+.btn-cancel:hover {
+  background: #20b2aa;
+  color: white;
+}
+
+.btn-edit {
+  background: #40e0d0;
+  color: #333;
+}
+
+.btn-edit:hover {
+  background: #20b2aa;
+  color: white;
+}
+
+.btn-delete {
+  background: #ff1493;
+  color: white;
+}
+
+.btn-delete:hover {
+  background: #c71585;
+}
+
+.btn-register {
+  background: #20b2aa;
+  color: white;
+}
+
+.btn-register:hover {
+  background: #008b8b;
+  transform: translateY(-1px);
+}
+
+.btn-email {
+  background: #ff69b4;
+  color: white;
+}
+
+.btn-email:hover {
+  background: #ff1493;
+  transform: translateY(-1px);
+}
+
+.empty-message {
+  color: #20b2aa;
+  font-style: italic;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  th, td {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.3rem;
+  }
+  button {
+    padding: 0.35rem 0.55rem;
+    font-size: 0.75rem;
+  }
+}
