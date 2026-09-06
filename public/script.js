@@ -1,8 +1,8 @@
-const COOKIE_NAME = "workouts";
+const COOKIE_NAME = "theory";
 const tbody = document.getElementById("workout-tbody");
 const emailSection = document.getElementById("email-section");
 
-let workouts = [];
+let theory = [];
 let registeredEmail = "";
 
 function generateId() {
@@ -30,40 +30,40 @@ function isValidEmail(email) {
 function persistCookie() {
   setCookie(COOKIE_NAME, JSON.stringify({
     email: registeredEmail || "",
-    workouts
+    theory
   }));
 }
 
-function loadWorkouts() {
+function loadtheory() {
   const raw = getCookie(COOKIE_NAME);
-  workouts = [];
+  theory = [];
   registeredEmail = "";
 
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        workouts = parsed;
+        theory = parsed;
       } else if (parsed && typeof parsed === "object") {
-        workouts = Array.isArray(parsed.workouts) ? parsed.workouts : [];
+        theory = Array.isArray(parsed.theory) ? parsed.theory : [];
         registeredEmail = parsed.email || "";
       }
     } catch {
-      workouts = [];
+      theory = [];
     }
   }
 
-  sortWorkouts();
+  sorttheory();
   renderEmailSection();
   renderTable();
 }
 
-function saveWorkouts() {
+function savetheory() {
   persistCookie();
 }
 
-function sortWorkouts() {
-  workouts.sort((a, b) => {
+function sorttheory() {
+  theory.sort((a, b) => {
     const da = a.date + "T" + (a.time || "00:00");
     const db = b.date + "T" + (b.time || "00:00");
     return db.localeCompare(da);
@@ -92,12 +92,12 @@ function getToday() {
 }
 
 function getLatestDefaults() {
-  if (workouts.length === 0) {
+  if (theory.length === 0) {
     return { type: "walk", distance: "" };
   }
   return {
-    type: workouts[0].type || "walk",
-    distance: workouts[0].distance != null ? workouts[0].distance : ""
+    type: theory[0].type || "walk",
+    distance: theory[0].distance != null ? theory[0].distance : ""
   };
 }
 
@@ -176,7 +176,7 @@ function renderEmailSection() {
     btn.type = "button";
     btn.className = "btn-email";
     btn.textContent = "Email";
-    btn.addEventListener("click", sendWorkoutsEmail);
+    btn.addEventListener("click", sendtheoryEmail);
     emailSection.appendChild(btn);
   } else {
     const btn = document.createElement("button");
@@ -238,17 +238,17 @@ function buildEmailTableHtml(list) {
   `;
 }
 
-async function sendWorkoutsEmail() {
+async function sendtheoryEmail() {
   if (!isValidEmail(registeredEmail)) {
     alert("No valid email registered.");
     renderEmailSection();
     return;
   }
-  if (workouts.length === 0) {
-    alert("No workouts to email.");
+  if (theory.length === 0) {
+    alert("No theory to email.");
     return;
   }
-  if (!confirm(`Send all ${workouts.length} workout(s) to ${registeredEmail}?`)) return;
+  if (!confirm(`Send all ${theory.length} workout(s) to ${registeredEmail}?`)) return;
 
   try {
     const res = await fetch("/api/send-mail", {
@@ -257,8 +257,8 @@ async function sendWorkoutsEmail() {
       body: JSON.stringify({
         email: registeredEmail,
         subject: "Workout Tracker",
-        html: buildEmailTableHtml(workouts),
-        workouts
+        html: buildEmailTableHtml(theory),
+        theory
       })
     });
     const data = await res.json().catch(() => ({}));
@@ -285,22 +285,22 @@ function renderTable() {
       alert("Date and time are required.");
       return;
     }
-    workouts.unshift({ id: generateId(), ...data });
-    sortWorkouts();
-    saveWorkouts();
+    theory.unshift({ id: generateId(), ...data });
+    sorttheory();
+    savetheory();
     renderTable();
   });
 
   document.getElementById("btn-add-cancel").addEventListener("click", clearInputRow);
 
-  if (workouts.length === 0) {
+  if (theory.length === 0) {
     const emptyTr = document.createElement("tr");
-    emptyTr.innerHTML = `<td colspan="10" class="empty-message">No workouts yet. Add your first one above!</td>`;
+    emptyTr.innerHTML = `<td colspan="10" class="empty-message">No theory yet. Add your first one above!</td>`;
     tbody.appendChild(emptyTr);
     return;
   }
 
-  workouts.forEach((w) => {
+  theory.forEach((w) => {
     const tr = document.createElement("tr");
     tr.dataset.id = w.id;
     tr.innerHTML = `
@@ -323,8 +323,8 @@ function renderTable() {
     tr.querySelector(".btn-edit").addEventListener("click", () => startInlineEdit(tr, w));
     tr.querySelector(".btn-delete").addEventListener("click", () => {
       if (!confirm("Delete this workout?")) return;
-      workouts = workouts.filter((item) => item.id !== w.id);
-      saveWorkouts();
+      theory = theory.filter((item) => item.id !== w.id);
+      savetheory();
       renderTable();
     });
   });
@@ -377,11 +377,11 @@ function startInlineEdit(tr, w) {
       return;
     }
 
-    const idx = workouts.findIndex((item) => item.id === w.id);
+    const idx = theory.findIndex((item) => item.id === w.id);
     if (idx !== -1) {
-      workouts[idx] = updated;
-      sortWorkouts();
-      saveWorkouts();
+      theory[idx] = updated;
+      sorttheory();
+      savetheory();
       renderTable();
     }
   });
@@ -391,4 +391,4 @@ function startInlineEdit(tr, w) {
   });
 }
 
-document.addEventListener("DOMContentLoaded", loadWorkouts);
+document.addEventListener("DOMContentLoaded", loadtheory);

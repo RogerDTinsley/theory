@@ -12,8 +12,8 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
 }
 
-function buildWorkoutTable(workouts) {
-  const rows = (workouts || []).map((w) => `
+function buildWorkoutTable(theory) {
+  const rows = (theory || []).map((w) => `
     <tr>
       <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.date)}</td>
       <td style="padding:8px;border:1px solid #ccc;text-align:center;">${escapeHtml(w.time)}</td>
@@ -62,7 +62,7 @@ export async function onRequestPost(context) {
       );
     }
 
-    const html = body.html || buildWorkoutTable(body.workouts || []);
+    const html = body.html || buildWorkoutTable(body.theory || []);
     const subject = body.subject || "Workout Tracker";
     const from = env.RESEND_FROM || "Workout Tracker <onboarding@resend.dev>";
 
